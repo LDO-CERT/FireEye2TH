@@ -40,6 +40,9 @@ Then install the Python requirements:
 
 `$ pip3 install -r requirements.txt`
 
+## Configuration parameters
+`ignored_tags` contains a list of tag that you wants to ignore.
+Some of the available tags are: `intendedEffect,affectedSystem,ttp,affectedIndustry,targetedInformation,targetGeography`
 
 ## Usage
 Once your configuration file `config.py` is ready, use the main program to 

@@ -5,7 +5,8 @@ FireEye = {
     },
     'url':'https://api.isightpartners.com',
     'fe_public_key':'',
-    'fe_private_key':''
+    'fe_private_key':'',
+    'ignored_tags': 'targetGeographies,tag2'
 }
 
 TheHive = {

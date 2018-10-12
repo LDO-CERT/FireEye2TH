@@ -48,7 +48,7 @@ def add_tags(tags, content):
         t.append("FE:{}".format(newtag))
     return t
 
-def th_alert_tags(incident):
+def th_alert_tags(incident, ignored_tags=None):
     
     """
     Convert FE incident tags into TH tags
@@ -65,6 +65,8 @@ def th_alert_tags(incident):
     for section in tag_section.keys():
         for k, v in tag_section[section].items():
             for sv in v:
+                if ignored_tags and section in [x.strip() for x in ignored_tags.split(',')]:
+                    continue
                 if type(sv) == str:
                     add_tags(tags, ["{}={}".format(k, sv)])
                 elif type(v) == dict:
@@ -159,7 +161,7 @@ def build_observables(observables):
 
     return artefacts
 
-def build_alert(incident, observables):
+def build_alert(incident, observables, ignored_tags=None):
     
     """
     Convert FireEye alert into a TheHive Alert
@@ -177,7 +179,7 @@ def build_alert(incident, observables):
                  severity=th_severity(incident.get('riskRating', 'NONE')),
                  description=description_to_markdown(incident),
                  type=incident.get('intelligenceType', None),
-                 tags=th_alert_tags(incident),
+                 tags=th_alert_tags(incident, ignored_tags),
                  caseTemplate=TheHive['template'],
                  source="FireEye",
                  sourceRef=incident.get('reportId'),
@@ -186,7 +188,7 @@ def build_alert(incident, observables):
     logging.debug("build_alert: alert built for FE id #{}".format(incident.get('reportId')))
     return a
 
-def find_incidents(feapi, since):
+def find_incidents(feapi, since, ignored_tags=None):
     
     """
     :param feapi: FireEye.api.FireEyeApi
@@ -206,14 +208,14 @@ def find_incidents(feapi, since):
         for report_id in report_ids:
             report_response = feapi.get_incident(report_id)
             report_data = report_response.get('data').get('message', {}).get('report', {})
-            logging.debug('get_incidents(): {} FE incident downloaded'.format( report_id ))
+            logging.debug('find_incidents(): {} FE incident downloaded'.format( report_id ))
             observables = get_observables(report_data)
-            yield build_alert(report_data, observables)
+            yield build_alert(report_data, observables, ignored_tags)
     else:
         logging.debug("find_incidents(): Error while fetching incident #{}: {}".format(id, response.get('data')))
         sys.exit("find_incidents(): Error while fetching incident #{}: {}".format(id, response.get('data')))
 
-def get_incidents(feapi, id_list):
+def get_incidents(feapi, id_list, ignored_tags=None):
     
     """
     :type feapi: FireEye.api.FireEyeApi
@@ -230,10 +232,10 @@ def get_incidents(feapi, id_list):
             data = response.get('data').get('message', {}).get('report', {})
             logging.debug('get_incidents(): {} FE incident downloaded'.format( id ))
             observables = get_observables(data)
-            yield build_alert(data, observables)
+            yield build_alert(data, observables, ignored_tags)
         else:
             logging.debug("get_incidents(): Error while fetching incident #{}: {}".format(id, response.get('data')))
-            sys.exit("find_incidents: Error while fetching incident #{}: {}".format(id, response.get('data')))
+            sys.exit("get_incidents: Error while fetching incident #{}: {}".format(id, response.get('data')))
 
 def get_observables(data):
 
@@ -288,11 +290,11 @@ def run():
         Download FireEye incident and create a new alert in TheHive
     """
 
-    def find(args):
+    def find(args, ignored_tags=None):
         if 'last' in args and args.last is not None:
             last = args.last.pop()
             
-        incidents = find_incidents(feapi, last)
+        incidents = find_incidents(feapi, last, ignored_tags)
         create_thehive_alerts(TheHive, incidents)
         
         if args.monitor:
@@ -300,9 +302,9 @@ def run():
                 os.path.dirname(os.path.realpath(__file__))))
             mon.touch()
  
-    def inc(args):
+    def inc(args, ignored_tags=None):
         if 'incidents' in args and args.incidents is not None:
-            incidents = get_incidents(feapi, args.incidents)
+            incidents = get_incidents(feapi, args.incidents, ignored_tags)
             create_thehive_alerts(TheHive, incidents)
 
     parser = argparse.ArgumentParser(description="Get FE incidents and create alerts in TheHive")
@@ -346,7 +348,7 @@ def run():
                             level='DEBUG',
                             format='%(asctime)s %(levelname)s %(message)s')
     feapi = FireEyeApi(FireEye)
-    args.func(args)
+    args.func(args, FireEye['ignored_tags'])
 
 if __name__ == '__main__':
     run()
