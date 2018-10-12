@@ -1,0 +1,5 @@
+requests
+
+thehive4py
+
+html2text
